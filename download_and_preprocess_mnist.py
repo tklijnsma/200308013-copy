@@ -37,10 +37,11 @@ def save_mnist():
             np.savez(key, label=mnist[key])
 
 def init():
-    if not osp.isdir('mnistdata'): os.makedirs('mnistdata')
+    downloadpath = 'mnistdata/raw'
+    if not osp.isdir(downloadpath): os.makedirs(downloadpath)
     _ = os.getcwd()
     try:
-        os.chdir('mnistdata')
+        os.chdir(downloadpath)
         download_mnist()
         save_mnist()
     finally:
