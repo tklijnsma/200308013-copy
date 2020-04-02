@@ -328,10 +328,17 @@ warnings.simplefilter('ignore')
 
 batch_size = 256
 
-path = osp.join('./', '..', 'data', 'MNIST')
-transform = T.Cartesian(cat=False)
-train_dataset = MNISTSuperpixels(path, True, transform=transform)
-test_dataset = MNISTSuperpixels(path, False, transform=transform)
+DO_FULL_MNIST = True
+if DO_FULL_MNIST:
+    from mnistdataset import MNISTDataset
+    train_dataset = MNISTDataset('mnistdata/', train=True)
+    test_dataset = MNISTDataset('mnistdata/', train=False)
+else:
+    path = osp.join('./', '..', 'data', 'MNIST')
+    transform = T.Cartesian(cat=False)
+    train_dataset = MNISTSuperpixels(path, True, transform=transform)
+    test_dataset = MNISTSuperpixels(path, False, transform=transform)
+
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
