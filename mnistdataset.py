@@ -1,6 +1,7 @@
-import os.path as osp, glob, numpy as np, sys
+import os.path as osp, glob, numpy as np, sys, os, gzip
 import torch
 from torch_geometric.data import (Data, Dataset)
+from urllib import request
 
 class MNISTDataset(Dataset):
     """
@@ -17,9 +18,18 @@ class MNISTDataset(Dataset):
         self.use_only_nonzero = True
         self.num_classes = 10
 
+    def download(self):
+        print('Downloading')
+        MNISTDownloader().download()
+
     @property
     def raw_file_names(self):
-        if not hasattr(self,'input_files'):
+        if (
+            not osp.isdir(self.raw_dir)
+            or len(glob.glob(osp.join(self.raw_dir, '*.npz'))) == 0
+            ):
+            self.download()
+        if not hasattr(self, 'input_files'):
             self.input_files = glob.glob(osp.join(self.raw_dir, '*.npz'))
         return [ osp.basename(f) for f in self.input_files ]
 
@@ -84,3 +94,52 @@ class MNISTDataset(Dataset):
     def get(self, i):
         self.load()
         return self.graphs[i]
+
+
+class MNISTDownloader(object):
+    def __init__(self, savedir='mnistdata/raw'):
+        super(MNISTDownloader, self).__init__()
+        self.savedir = savedir
+        self.download_url = 'http://yann.lecun.com/exdb/mnist/'
+        self.files = {
+            'training_images' : 'train-images-idx3-ubyte.gz',
+            'test_images'     : 't10k-images-idx3-ubyte.gz',
+            'training_labels' : 'train-labels-idx1-ubyte.gz',
+            'test_labels'     : 't10k-labels-idx1-ubyte.gz',
+            }
+
+    def download(self):
+        os.makedirs(self.savedir, exist_ok=True)
+        self.download_zips()
+        self.process()
+
+    def download_zips(self):
+        for file in self.files.values():
+            dst = osp.join(self.savedir, file)
+            if not osp.isfile(dst):
+                print('Downloading {0}...'.format(file))
+                request.urlretrieve(osp.join(self.download_url, file), dst)
+            else:
+                print('Found {0}, not re-downloading'.format(file))
+
+    def process(self):
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.savedir)
+            for key, zipfile in self.files.items():
+                with gzip.open(zipfile, 'rb') as f:
+                    if 'images' in key:
+                        data = np.frombuffer(
+                            f.read(), np.uint8, offset=16
+                            ).reshape(-1,28,28)
+                        np.savez(key, img=data)
+                    else:
+                        data = np.frombuffer(f.read(), np.uint8, offset=8)
+                        np.savez(key, label=data)
+                print(
+                    'Processed {0} --> {1}, removing {0}'
+                    .format(zipfile, key + '.npz')
+                    )
+                os.remove(zipfile)
+        finally:
+            os.chdir(cwd)
