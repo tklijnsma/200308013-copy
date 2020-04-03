@@ -359,7 +359,7 @@ class Net(nn.Module):
         self.drn = DynamicReductionNetwork(input_dim=3, hidden_dim=hidden_dim,
                                            k=4,
                                            output_dim=d.num_classes, aggr='add',
-                                           norm=torch.tensor([1., 1./27., 1./27.]))
+                                           norm=torch.tensor([1./255., 1./28., 1./28.] if DO_FULL_MNIST else [1., 1./27., 1./27.]))
     def forward(self, data):
         logits = self.drn(data)
         return F.log_softmax(logits, dim=1)
@@ -415,7 +415,29 @@ def test():
         correct += pred.eq(data.y).sum().item()
     return correct / len(test_dataset)
 
+
+def make_chkt_dir():
+    ckpt_outdir = 'ckpts_{0}'
+    for i in range(200):
+        if not(osp.isdir(ckpt_outdir.format(i))): return ckpt_outdir.format(i)
+    else:
+        raise RuntimeError('Clean up checkpoints first')
+ckpt_dir = make_chkt_dir()
+
+def write_checkpoint(checkpoint_number, best=False):
+    ckpt = 'ckpt_best.pth.tar' if best else 'ckpt_{0}.pth.tar'.format(checkpoint_number)
+    ckpt = osp.join(ckpt_dir, ckpt)
+    os.makedirs(ckpt_dir, exist_ok=True)
+    if best: print('Saving epoch {0} as new best'.format(checkpoint_number))
+    torch.save(dict(model=model.state_dict()), ckpt)
+
+
+best_test_acc = 0.0
 for epoch in range(1, 401):
     train(epoch)
     test_acc = test()
+    write_checkpoint(epoch)
     print('Epoch: {:02d}, Test: {:.4f}'.format(epoch, test_acc))
+    if test_acc > best_test_acc:
+        best_test_acc = test_acc
+        write_checkpoint(epoch, best=True)
